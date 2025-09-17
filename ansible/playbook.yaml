@@ -1,0 +1,46 @@
+---
+- name: Configurar Nginx como proxy
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    project_root: "{{ playbook_dir | realpath }}"
+    nginx_conf_host: "{{ project_root }}/../host_volumes/nginx_conf"
+    web_root_host: "{{ project_root }}/../host_volumes/web"
+    nginx_container: "nginx_proxy"
+
+  tasks:
+    - name: Crear directorios en el host
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ nginx_conf_host }}"
+        - "{{ web_root_host }}"
+
+    - name: Copiar archivo index.html
+      ansible.builtin.copy:
+        src: files/index.html
+        dest: "{{ web_root_host }}/index.html"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Copiar configuración de Nginx
+      ansible.builtin.copy:
+        src: templates/nginx.conf
+        dest: "{{ nginx_conf_host }}/default.conf"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Recargar Nginx dentro del contenedor (si existe)
+      ansible.builtin.command:
+        cmd: docker exec {{ nginx_container }} nginx -s reload
+      register: reload_result
+      failed_when: false
+
+    - name: Mostrar resultado de recarga
+      ansible.builtin.debug:
+        var: reload_result.stdout
